@@ -321,10 +321,10 @@ public class MainActivity extends Activity implements SensorEventListener{
                 if(gravity != null && geomagnetic != null){
                     float R[] = new float[9];
                     float I[] = new float[9];
-                    boolean success = SensorManager.getRotationMatrix(R,I,accelerometerReading,geomagnetic);
+                    boolean success = SensorManager.getRotationMatrix(R,null,accelerometerReading,geomagnetic);
                     if(success){
                         SensorManager.getOrientation(R, orientation);
-                        azimuth.setText("方位:" + String.valueOf(orientation));
+                        azimuth.setText("方位:" + String.valueOf(azimuthrad2deg(orientation[0])));
                     }
                 }
                 break;
@@ -358,6 +358,20 @@ public class MainActivity extends Activity implements SensorEventListener{
             retvec[i] = vec[i] / (float)Math.PI*180;
         }
         return retvec;
+    }
+
+    private float azimuthrad2deg(float azi){
+		float north;
+		if(Math.signum(azi)==1.0){//正の場合
+			north = azi/(float)Math.PI*180;
+		}
+		else if (Math.signum(azi)==-1.0){//負の場合
+			north = 360+azi/(float)Math.PI*180;
+		}
+		else{//0のとき
+			north = 0;
+		}
+		return  north;
     }
 
 
