@@ -7,7 +7,6 @@ import androidx.annotation.RequiresApi;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -23,9 +22,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
-import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.lang.Object;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -49,13 +46,14 @@ public class MainActivity extends Activity implements SensorEventListener{
     //移動方向推定
     private float[] accelValue = new float[3];  //加速度
     private float[] geomagnetic = new float[3]; //地磁気
-    private float[] gravity = new float[3];    //重力
+    private float[] gravity = {0.0f,0.0f,0.0f};    //重力
     private float[] north = new float[3];       //N軸
     private float[] east = new float[3];        //E軸
     //GNE軸への射影成分
     private float[] gneAccel = new float[3];
     private float[] orientation = new float[3]; //方位角（degree）
     private float orientationRad = 0;   //方位角（rad）
+	private final float[] accelerometerReading = new float[3];
     //移動方向推定
     private long lastAccelTime = 0;
     private float[] speed = new float[3];   //速度
@@ -64,12 +62,10 @@ public class MainActivity extends Activity implements SensorEventListener{
     //回転行列
     private float[] rotationMatrix = new float[9];
     //閾値
-    protected final static double THRESHOLD = 1.5;
+    protected final static double THRESHOLD = 2.0;
     protected final static double THRESHOLD_MIN=1;
     //ローパスフィルタのα値
-    protected final static double alpha =0.1;
-	//端末が実際に取得した加速度値。重力加速度も含まれる。This values include gravity force.
-	private float[] currentOrientationValues = { 0.0f, 0.0f, 0.0f };
+    protected final static double alpha =0.2;
 	//ローパス、ハイパスフィルタ後の加速度値 Values after low pass and high pass filter
 	private float[] currentAccelerationValues = { 0.0f, 0.0f, 0.0f };
 
@@ -121,7 +117,7 @@ public class MainActivity extends Activity implements SensorEventListener{
     private String finData="";
     private BufferedWriter bw;
 
-    public class MyData{
+	public class MyData{
         public Long time;
         public String x_accel;
         public String y_accel;
@@ -160,18 +156,6 @@ public class MainActivity extends Activity implements SensorEventListener{
                     moveTextx.setText("X:" + String.valueOf(difference[0]));
                     moveTexty.setText("Y:" + String.valueOf(difference[1]));
                     moveTextz.setText("Z:" + String.valueOf(difference[2]));
-
-//                    //ついでに出力用に
-//                    //現在時刻を取得
-//                    Timestamp timestamp = new Timestamp(System.currentTimeMillis());
-//                    //int型にする
-//                    long time = System.currentTimeMillis();//currentTimeMIllis()はlong型で時刻を出しているので
-//                    MyData mydata = new MyData();
-//                    mydata.time= time;
-//                    mydata.x_accel = String.valueOf(difference[0]);
-//                    mydata.y_accel = String.valueOf(difference[1]);
-//                    mydata.z_accel = String.valueOf(difference[2]);
-//                    finDataList.add(mydata);
 
                     //リセット
                     lastAccelTime = 0;
@@ -268,15 +252,15 @@ public class MainActivity extends Activity implements SensorEventListener{
             case Sensor.TYPE_ACCELEROMETER:   //加速度m/s^2
 
 	            // 取得 Acquiring data
+	            System.arraycopy(event.values, 0, accelerometerReading, 0, accelerometerReading.length);
 
 	            for(int j=0;j<3;j++) {
 	            	// ローパスフィルタで重力値を抽出　Isolate the force of gravity with the low-pass filter.
-		            currentOrientationValues[j] = (float) (event.values[j] * alpha + currentOrientationValues[j] * (1.0f - alpha));
+		            gravity[j] = (float) (event.values[j] * alpha + gravity[j] * (1.0f - alpha));
 		            // 重力の値を省くRemove the gravity contribution with the high-pass filter.
-		            currentAccelerationValues[j] = event.values[j] - currentOrientationValues[j];
+		            currentAccelerationValues[j] = event.values[j] - gravity[j];
 	            }
-
-	            //int型にする
+	            
 	            long time = System.currentTimeMillis();//currentTimeMIllis()はlong型で時刻を出しているので
 	            MyData mydata = new MyData();
 	            mydata.time= time;
@@ -296,8 +280,7 @@ public class MainActivity extends Activity implements SensorEventListener{
 	            if (noiseflg) {
 		            noiseflg = false;
 	            } else {
-
-		            if (vectorSize > THRESHOLD /* && dz <0.0f */) {
+	            	if (vectorSize > THRESHOLD) {
 			            if (counted == true) {
 				            counter++;
 				            counted = false;
@@ -338,13 +321,17 @@ public class MainActivity extends Activity implements SensorEventListener{
                 if(gravity != null && geomagnetic != null){
                     float R[] = new float[9];
                     float I[] = new float[9];
-                    boolean success = SensorManager.getRotationMatrix(R,I,gravity,geomagnetic);
+                    boolean success = SensorManager.getRotationMatrix(R,I,accelerometerReading,geomagnetic);
                     if(success){
                         SensorManager.getOrientation(R, orientation);
                         azimuth.setText("方位:" + String.valueOf(orientation));
                     }
                 }
                 break;
+
+	        case Sensor.TYPE_GYROSCOPE:
+
+	        	break;
 
 
             default:
